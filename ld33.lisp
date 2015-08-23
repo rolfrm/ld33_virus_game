@@ -65,7 +65,7 @@
       (dealloc (cast buf (ptr void))))))
 
 
-(defvar lv (im:load-image "level1.png"))
+(defvar lv (im:load-image "level3.png"))
 
 ;(defvar lv2 (im:load-image "level1.png"))
 (defvar backbuf (im:make 200 200 1))
@@ -182,27 +182,42 @@
 			    (setf out-pt pt)
 			    (setf current-d d))))))))
     out-pt))
+(defun take-closer (void (current (ptr point)) (new point) (player-pos point) (lv im:image))
+  (when (and 
+	 (> (pt-dst-sqrt (deref current) player-pos) 
+	    (pt-dst-sqrt new player-pos))
+	 (eq (deref (lookup-point new lv)) gameid:wall))
+    (setf (deref current) player-pos)))
 
-(defun game-it
-    (let ((upper-pt :type point)
-	  (lower-pt :type point)
-	  (ppos (vec2-to-point player-pos)))
-      (let ((success (get-flow-points player-pos player-dir lv 
-				      (addrof lower-pt) (addrof
-							 upper-pt))))
-	(unless success
-	  (setf success (get-flow-points (vec (ceil (member player-pos x)) (ceil
-							      (member
-							       player-pos
-							       y ))) player-dir lv 
-			   (addrof lower-pt) (addrof upper-pt))))
+(defun game-it (void (last-upper-pt (ptr point)) (last-lower-pt (ptr point)))
+  (let ((ppos (vec2-to-point player-pos))
+	(lower-pt (deref last-lower-pt))
+	(upper-pt (deref last-upper-pt)))
+
+      (let ((success (get-flow-points player-pos player-dir lv (addrof lower-pt) (addrof upper-pt))))
 	(when success
-	  (setf upper-pt (find-closer-point ppos upper-pt lv 1))
-	  (setf lower-pt (find-closer-point ppos lower-pt lv 1))
+	  (take-closer last-upper-pt upper-pt ppos lv)
+	  (take-closer last-lower-pt lower-pt ppos lv)
+	  )
+	(let ((success2 (get-flow-points (vec (ceil (member player-pos x)) (ceil
+									  (member
+									   player-pos
+									   y ))) player-dir lv 
+			    last-lower-pt last-upper-pt)))
+	  (when success2
+	    (take-closer last-upper-pt upper-pt ppos lv)
+	    (take-closer last-lower-pt lower-pt ppos lv)
+	    )
+	  
+	  (setf success 
+		(or success success2)))
+	(when success
+	  (setf (deref last-upper-pt) (find-closer-point ppos (deref last-upper-pt) lv 1))
+	  (setf (deref last-lower-pt) (find-closer-point ppos (deref last-lower-pt) lv 1))
 	  ;(setf (deref (lookup-point upper-pt lv2)) 200)
 	  ;(setf (deref (lookup-point lower-pt lv2)) 200)
-	  (let ((lower-vec (point-to-vec2 lower-pt))
-		(upper-vec (point-to-vec2 upper-pt)))
+	  (let ((lower-vec (point-to-vec2 (deref last-lower-pt)))
+		(upper-vec (point-to-vec2 (deref last-upper-pt))))
 	    (let ((perp-vec (vec2-normalize (vec2:rot90 (- lower-vec upper-vec )))))
 	      (when (> (vec2-length perp-vec) 0)
 		(setf player-dir (+ (* player-dir 0.5) (* perp-vec 0.5)))))
@@ -315,6 +330,12 @@
 (defvar game-tex (fs-blit:load-image backbuf gl:clamp-to-border))
 
 (defvar it-pos player-pos)
+(defvar last-upper (make-point 1000 1000))
+(defvar last-lower (make-point -1000 -1000))
+(defvar last-lower-id enemy-cnt)
+(defvar last-upper-id (+ 1 enemy-cnt))
+(add-to-list+ enemy-pos enemy-cnt last-upper)
+(add-to-list+ enemy-pos enemy-cnt last-lower)
 (defun run-game
     (let ((iteration 0)
 	  (w (cast (member backbuf width) f64))
@@ -322,8 +343,9 @@
       (range iteration 0 10000
 	
 
-	(game-it)
-
+	(game-it (addrof last-upper) (addrof last-lower))
+	(setf (deref (ptr+ enemy-pos last-lower-id)) last-lower)
+	(setf (deref (ptr+ enemy-pos last-upper-id)) last-upper)
 	(let ((cpos (deref (lookup-point (vec2-to-point player-pos) lv))))
 	  (when (or (eq cpos gameid:enemy) 
 		    (eq cpos gameid:wall))
