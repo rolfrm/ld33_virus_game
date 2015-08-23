@@ -203,9 +203,9 @@
 		(upper-vec (point-to-vec2 upper-pt)))
 	    (let ((perp-vec (vec2-normalize (vec2:rot90 (- lower-vec upper-vec )))))
 	      (when (> (vec2-length perp-vec) 0)
-		(setf player-dir (+ (* player-dir 0.8) (* perp-vec 0.2)))))
+		(setf player-dir (+ (* player-dir 0.5) (* perp-vec 0.5)))))
 	  )))
-      (incr player-pos (* player-dir 0.2))
+      (incr player-pos (* player-dir 0.4))
       ))
 
 (load "fs-blit.lisp")
@@ -277,7 +277,7 @@
   (dealloc (cast data (ptr void))))
 
 (defvar rect-huge-uv-vbo (gl:gen-buffer))
-(defvar huge-f32 (the 50 f32))
+(defvar huge-f32 (the 500 f32))
 (let ((data (cast (alloc (* 4 4 2)) (ptr f32)))) ;4 vec2f's
   (setf (deref (ptr+ data 0)) 0)
   (setf (deref (ptr+ data 1)) 0)
@@ -306,12 +306,14 @@
 (defvar tex:enemy (tex:load "enemy.png"))
 (defvar tex:bubbles (tex:load-repeat "bubbles.png"))
 (defvar tex:flesh-wall (tex:load-repeat "flesh-wall.png"))
+(defvar tex:flesh-wall2 (tex:load-repeat "flesh-wall2.png"))
 (gl:enable-vertex-attrib-array 0)   
 (gl:enable-vertex-attrib-array 1)
 (defvar game-tex (fs-blit:load-image backbuf gl:clamp-to-border))
 
 ;(print (cast tex:bubbles i32) newline)
 ;(exit 0)
+(defvar it-pos player-pos)
 (defun run-game
     (let ((iteration 0)
 	  (w (cast (member backbuf width) f64))
@@ -344,11 +346,11 @@
 	(gl:vertex-attrib-pointer 1 2 gl:float gl:false 0 null)
 	(gl:bind-buffer gl:array-buffer rect-vbo)
 	(gl:vertex-attrib-pointer 0 2 gl:float gl:false 0 null) 
-
-	(gl:uniform fs-blit:shader:cam-offset (* player-pos 4.0))
+	(incr it-pos player-dir)
+	(gl:uniform fs-blit:shader:cam-offset (* it-pos 4.0))
 	(gl:uniform fs-blit:shader:cam-size (vec w h))
-	(gl:uniform fs-blit:shader:size (vec 2000 2000))
-	(gl:uniform fs-blit:shader:offset (vec -1000 -1000))
+	(gl:uniform fs-blit:shader:size (vec 20000 20000))
+	(gl:uniform fs-blit:shader:offset (vec -10000 -1000))
 	(gl:uniform fs-blit:shader:dir 1.0 0.0)
 
 	(gl:bind-texture gl:texture-2d tex:bubbles)
@@ -368,9 +370,11 @@
 	       (range col (- 0 w) w
 		      (let ((pp (vec2-to-point (+ player-pos (vec (cast row f64) (cast col f64))))))
 			(let ((color (deref (lookup-point pp lv))))
-			  (setf color (if (or (eq color gameid:enemy) 
-					      (eq color gameid:wall)) 
-					  gameid:wall 0))
+			  (setf color (if (eq color gameid:wall)
+					  1
+					  (if (eq color gameid:enemy)
+					      2
+					      0)))
 			  (setf (deref (lookup-point (make-point (+ row w) (+ col w)) backbuf))
 				color))))))
 	(fs-blit:reload-image game-tex backbuf)
@@ -387,10 +391,10 @@
 	(gl:bind-buffer gl:array-buffer rect-vbo)
 	(gl:vertex-attrib-pointer 0 2 gl:float gl:false 0 null) 
 	(gl:active-texture gl:texture1)
-	(gl:bind-texture gl:texture-2d tex:flesh-wall)
+	(gl:bind-texture gl:texture-2d tex:flesh-wall2)
 	(gl:active-texture gl:texture0)
 	(gl:bind-texture gl:texture-2d game-tex)
-	(let ((uvs (the 16 f64)))
+	(let ((uvs (the 32 f64)))
 	  (gl:uniform fs-blit2:shader:uv-scale (vec uvs uvs))
 	  (gl:uniform fs-blit2:shader:uv-offset (* (/ (vec2:floor player-pos) (vec w h)) uvs)))
 	(gl:draw-arrays gl:quads 0 4)	  
@@ -401,7 +405,7 @@
 	(gl:uniform fs-blit:shader:size (vec w h))
 	(gl:bind-buffer gl:array-buffer rect-one-vbo)
 	(gl:vertex-attrib-pointer 0 2 gl:float gl:false 0 null) 
-	(gl:uniform fs-blit:shader:size (vec 4 4))
+	(gl:uniform fs-blit:shader:size (vec 8 8))
 	(gl:uniform fs-blit:shader:offset player-pos)
 
 	(gl:uniform fs-blit:shader:dir player-dir)

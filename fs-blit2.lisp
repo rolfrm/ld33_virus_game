@@ -27,7 +27,7 @@ void main(){
   vec4 col = texture(tex, uv);
   if(col == vec4(1,0,1,1) || col == vec4(0,0,0,1))
    discard;
-  col = texture(tex2, uv2) * col.r; 
+  col = texture(tex2, mod(uv2,vec2(0.499,1)) + vec2(col.r * 128 - 0.5, 0.0)); 
   gl_FragColor = col;
 }
 ")
