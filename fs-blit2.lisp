@@ -28,8 +28,12 @@ void main(){
 
   vec4 col = texture(tex, uv);
   if(col == vec4(1,0,1,1) || col == vec4(0,0,0,1))
-   discard;
-  col = texture(tex2, mod(uv2,vec2(1.0/items,1)) + vec2(col.r * (256.0/items) - (1.0/items), 0.0)); 
+    discard;
+  //gl_FragColor = col;
+  float texture_offset = col.r * 256.0 / items;
+  vec2 inner_offset = mod(uv2, vec2(1.0/items,1));
+  col = texture(tex2,inner_offset * 0.9 + vec2(texture_offset,0));
+  //col = texture(tex2,  inner_offset + vec2(texture_offset, 0)); 
   if(col == vec4(1,0,1,1) || col == vec4(0,0,0,1))
    discard;
   gl_FragColor = col;
@@ -100,5 +104,5 @@ void main(){
 	(gl:uniform-1i fs-blit2:shader:tex 1)
 	(gl:uniform-2f fs-blit2:shader:uv-offset 0 0)
 	(gl:uniform-2f fs-blit2:shader:uv-scale 1 1)
-	(gl:uniform-1f fs-blit2:shader:items 4.0)
+	(gl:uniform-1f fs-blit2:shader:items 5.0)
 	)))

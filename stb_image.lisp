@@ -30,6 +30,16 @@
 	      0))
     out-im))
 
+(defun im:load-gray (im:image (filename (ptr char)))
+  (let ((out-im :type im:image))
+    (setf 
+     (member out-im data)
+     (im:load filename (addrof (member out-im width)) 
+	      (addrof (member out-im height))
+	      (addrof (member out-im bpp))
+	      1))
+    out-im))
+
 (defun im:free-image (void (image im:image))
   (im:free (member image data)))
 	     

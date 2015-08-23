@@ -52,22 +52,66 @@
   (lookup (member pt x) 
 	  (member pt y) im))
 
+(defun print-color(void (col color))
+  (print "(RGBA: " (member col r) " " (member col g)  " "
+	 (member col b) " " (member col a) ")"))
+(overload print print-color)
+
+(defun u32-to-color (color (value u32))
+  (let ((out-color :type color))
+    (print value "<< COLOR" newline)
+    (setf (member out-color r) (cast (bit-and value 0xFF) u8))
+    (setf (member out-color g) (cast (>> (bit-and value 0xFF00) 8) u8))
+    (setf (member out-color b) (cast (>> (bit-and value 0xFF0000) 16) u8))
+    (setf (member out-color a) (cast (>> (bit-and value 0xFF000000) 24) u8))
+    out-color))
+
+
 (defun analyze-image (void (im im:image))
-  (let ((buf (cast (alloc0 (* 256 4)) (ptr i32)))
-	(data (member im data)))
-    (let ((size (cast (* (member im width) (member im height)) i64)))
-      (range it 0 size
-	     (incr (deref (+ buf (cast (deref (+ data it)) i64))) 1))
-      (range it 0 256
+  (let ((buf (cast null (ptr u32)))
+	(colors (cast null (ptr u32)))
+	(buf-size 0)
+	(data (member im data))
+	(mask (cast 0 u32))
+	(bpp (cast (member im bpp) i64)))
+    (when (eq (member im bpp) 1)
+	(setf mask 0xFF))
+    (when (eq (member im bpp) 3)
+      (setf mask 0xFFFFFF))
+    (when (eq (member im bpp) 4)
+      (setf mask 0xFFFFFFF))
+    (let ((size (cast (* (member im width) (member im height) (member im bpp)) i64))
+	  (it 0))
+      (while! (< it size)
+
+	     (let ((color (deref (cast (+ data it) (ptr u32))))
+		   (found false))
+	       (setf color (bit-and color mask))
+	       (range bufit 0 buf-size
+		      (when (eq (deref (+ colors bufit)) color)
+			
+			(incr (deref (+ buf bufit)) 1)
+			(setf bufit (- buf-size 1))
+			(setf found true)))
+	       (unless found
+		 (add-to-list+ buf buf-size 1)
+		 (setf buf-size (- buf-size 1))
+		 (add-to-list+ colors buf-size color)
+		 )
+	       (incr it bpp)))
+      (print ">>>" buf-size newline)
+      (range it 0 buf-size
 	     (let ((bv (deref (+ buf it))))
-	       (when (not (eq bv 0))
-		 (print it ":" bv newline))))
-      (dealloc (cast buf (ptr void))))))
+	       (print " " it " " (u32-to-color (deref (+ colors it))) ":" bv newline))))
+      (dealloc (cast buf (ptr void)))))
 
+(defvar lv (im:load-image "level1.png"));"person.png"))
 
-(defvar lv (im:load-image "level3.png"))
-
-;(defvar lv2 (im:load-image "level1.png"))
+(defvar lv2 (im:load-image "chunks/eye.png"))
+(analyze-image lv2)
+(exit 0)
+(print "Image2: " (member lv2 bpp) " " newline)
+(exit 0)
 (defvar backbuf (im:make 200 200 1))
 (print "Image: " (member lv width) " " (member lv height) " " (member lv bpp) newline)
 ;(analyze-image lv)
@@ -208,14 +252,17 @@
 	    (take-closer last-upper-pt upper-pt ppos lv)
 	    (take-closer last-lower-pt lower-pt ppos lv)
 	    ))
-
-	(setf (deref last-upper-pt) (find-closer-point ppos (deref last-upper-pt) lv 1))
-	(setf (deref last-lower-pt) (find-closer-point ppos (deref last-lower-pt) lv 1))
-	(let ((lower-vec (point-to-vec2 (deref last-lower-pt)))
-	      (upper-vec (point-to-vec2 (deref last-upper-pt))))
-	  (let ((perp-vec (vec2-normalize (vec2:rot90 (- lower-vec upper-vec )))))
-	    (when (> (vec2-length perp-vec) 0)
-	      (setf player-dir (+ (* player-dir 0.8) (* perp-vec 0.2)))))
+	(setf success (and
+		       (eq (deref (lookup-point upper-pt lv)) gameid:wall)
+		       (eq (deref (lookup-point lower-pt lv)) gameid:wall)))
+	(when success
+	  (setf (deref last-upper-pt) (find-closer-point ppos (deref last-upper-pt) lv 1))
+	  (setf (deref last-lower-pt) (find-closer-point ppos (deref last-lower-pt) lv 1))
+	  (let ((lower-vec (point-to-vec2 (deref last-lower-pt)))
+		(upper-vec (point-to-vec2 (deref last-upper-pt))))
+	    (let ((perp-vec (vec2-normalize (vec2:rot90 (- lower-vec upper-vec )))))
+	      (when (> (vec2-length perp-vec) 0)
+		(setf player-dir (+ (* player-dir 0.8) (* perp-vec 0.2))))))
 	  ))
   (incr player-pos (* player-dir 0.4))
   ))
@@ -232,12 +279,12 @@
 	  gl:rgba)))
 	  
 	  
-(defun fs-blit:load-image (gl:tex (image im:image) (clamp gl:enum))
+(defun fs-blit:load-image (gl:tex (image im:image) (clamp gl:enum) (interp gl:enum))
   (let ((tex :type gl:tex))
     (gl:gen-textures 1 (addrof tex))
     (gl:bind-texture gl:texture-2d tex)
-    (gl:tex-parameter gl:texture-2d gl:texture-min-filter gl:nearest)
-    (gl:tex-parameter gl:texture-2d gl:texture-mag-filter gl:nearest)
+    (gl:tex-parameter gl:texture-2d gl:texture-min-filter interp)
+    (gl:tex-parameter gl:texture-2d gl:texture-mag-filter interp)
     (gl:tex-parameter gl:texture-2d gl:texture-wrap-s clamp)
     (gl:tex-parameter gl:texture-2d gl:texture-wrap-t clamp)
     (gl:tex-image-2d gl:texture-2d 0 gl:rgb 
@@ -307,22 +354,27 @@
 
 (defun tex:load (gl:tex (file (ptr char)))
   (let ((virus (im:load-image file)))
-    (fs-blit:load-image virus  gl:clamp-to-border)))
+    (fs-blit:load-image virus  gl:clamp-to-border gl:nearest)))
+
+(defun tex:load2 (gl:tex (file (ptr char)))
+  (let ((virus (im:load-image file)))
+    (fs-blit:load-image virus  gl:clamp-to-border gl:linear)))
+
 
 (defun tex:load-repeat (gl:tex (file (ptr char)))
   (let ((virus (im:load-image file)))
-    (fs-blit:load-image virus  gl:repeat)))
+    (fs-blit:load-image virus  gl:repeat  gl:nearest)))
     
     
 (defvar tex:virus (tex:load "virus.png"))
 (defvar tex:enemy (tex:load "enemy.png"))
 (defvar tex:bubbles (tex:load-repeat "bubbles.png"))
-(defvar tex:flesh-wall (tex:load-repeat "flesh-wall.png"))
-(defvar tex:flesh-wall2 (tex:load-repeat "flesh-wall2.png"))
-(defvar tex:flesh-wall3 (tex:load-repeat "flesh-wall3.png"))
+(defvar tex:flesh-wall (tex:load "flesh-wall.png"))
+(defvar tex:flesh-wall2 (tex:load "flesh-wall2.png"))
+(defvar tex:flesh-wall3 (tex:load "flesh-wall3.png"))
 (gl:enable-vertex-attrib-array 0)   
 (gl:enable-vertex-attrib-array 1)
-(defvar game-tex (fs-blit:load-image backbuf gl:clamp-to-border))
+(defvar game-tex (fs-blit:load-image backbuf gl:clamp-to-border gl:nearest))
 
 (defvar it-pos player-pos)
 (defvar last-upper (make-point 1000 1000))
@@ -368,7 +420,7 @@
 	(gl:bind-buffer gl:array-buffer rect-vbo)
 	(gl:vertex-attrib-pointer 0 2 gl:float gl:false 0 null) 
 	(decr it-pos player-dir)
-	(gl:uniform-1f fs-blit2:shader:items 4.0)
+	(gl:uniform-1f fs-blit2:shader:items 5.0)
 	(gl:uniform fs-blit:shader:cam-offset (* it-pos 4.0))
 	(gl:uniform fs-blit:shader:cam-size (vec w h))
 	(gl:uniform fs-blit:shader:size (vec 20000 20000))
@@ -408,9 +460,9 @@
 	(let ((game-offset (- player-pos (vec2:floor player-pos))))
 	  (let ((offset2 game-offset))
 	    (setf offset2 (- (vec 0 0) offset2))
-	    (gl:uniform fs-blit2:shader:offset (+ offset2 (- player-pos (* (vec w h) 0.5))))
+	    (gl:uniform fs-blit2:shader:offset (+ offset2 (- (vec2:floor player-pos) (* (vec w h) 0.5))))
 	    ))
-	(gl:uniform fs-blit2:shader:cam-offset player-pos)
+	(gl:uniform fs-blit2:shader:cam-offset (vec2:floor player-pos))
 	(gl:uniform fs-blit2:shader:size (vec w h))
 	(gl:uniform fs-blit2:shader:dir 1 0)
 
