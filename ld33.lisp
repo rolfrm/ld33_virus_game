@@ -187,7 +187,7 @@
 	 (> (pt-dst-sqrt (deref current) player-pos) 
 	    (pt-dst-sqrt new player-pos))
 	 (eq (deref (lookup-point new lv)) gameid:wall))
-    (setf (deref current) player-pos)))
+    (setf (deref current) new)))
 
 (defun game-it (void (last-upper-pt (ptr point)) (last-lower-pt (ptr point)))
   (let ((ppos (vec2-to-point player-pos))
@@ -199,31 +199,26 @@
 	  (take-closer last-upper-pt upper-pt ppos lv)
 	  (take-closer last-lower-pt lower-pt ppos lv)
 	  )
-	(let ((success2 (get-flow-points (vec (ceil (member player-pos x)) (ceil
-									  (member
-									   player-pos
-									   y ))) player-dir lv 
-			    last-lower-pt last-upper-pt)))
+	(let ((success2 (get-flow-points (vec (ceil (member player-pos x)) 
+					      (ceil (member player-pos y))) 
+					 player-dir lv 
+					 (addrof lower-pt) 
+					 (addrof upper-pt))))
 	  (when success2
 	    (take-closer last-upper-pt upper-pt ppos lv)
 	    (take-closer last-lower-pt lower-pt ppos lv)
-	    )
-	  
-	  (setf success 
-		(or success success2)))
-	(when success
-	  (setf (deref last-upper-pt) (find-closer-point ppos (deref last-upper-pt) lv 1))
-	  (setf (deref last-lower-pt) (find-closer-point ppos (deref last-lower-pt) lv 1))
-	  ;(setf (deref (lookup-point upper-pt lv2)) 200)
-	  ;(setf (deref (lookup-point lower-pt lv2)) 200)
-	  (let ((lower-vec (point-to-vec2 (deref last-lower-pt)))
-		(upper-vec (point-to-vec2 (deref last-upper-pt))))
-	    (let ((perp-vec (vec2-normalize (vec2:rot90 (- lower-vec upper-vec )))))
-	      (when (> (vec2-length perp-vec) 0)
-		(setf player-dir (+ (* player-dir 0.5) (* perp-vec 0.5)))))
-	  )))
-      (incr player-pos (* player-dir 0.4))
-      ))
+	    ))
+
+	(setf (deref last-upper-pt) (find-closer-point ppos (deref last-upper-pt) lv 1))
+	(setf (deref last-lower-pt) (find-closer-point ppos (deref last-lower-pt) lv 1))
+	(let ((lower-vec (point-to-vec2 (deref last-lower-pt)))
+	      (upper-vec (point-to-vec2 (deref last-upper-pt))))
+	  (let ((perp-vec (vec2-normalize (vec2:rot90 (- lower-vec upper-vec )))))
+	    (when (> (vec2-length perp-vec) 0)
+	      (setf player-dir (+ (* player-dir 0.5) (* perp-vec 0.5)))))
+	  ))
+  (incr player-pos (* player-dir 0.4))
+  ))
 
 (load "fs-blit.lisp")
 (load "fs-blit2.lisp")
