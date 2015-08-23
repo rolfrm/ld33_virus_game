@@ -208,86 +208,10 @@
       (incr player-pos (* player-dir 0.2))
       ))
 
-
-(defvar fs-blit:loaded false)
-(defvar fs-blit:shader :type gl:shader-program)
-(defvar fs-blit:shader:tex :type gl:uniform-loc)
-(defvar fs-blit:shader:offset :type gl:uniform-loc)
-(defvar fs-blit:shader:size :type gl:uniform-loc)
-(defvar fs-blit:shader:dir :type gl:uniform-loc)
-(defvar fs-blit:shader:cam-size (gl:get-uniform-location fs-blit:shader "cam_size"))
-(defvar fs-blit:shader:cam-offset (gl:get-uniform-location fs-blit:shader "cam_offset"))
-(defun fs-blit:load
-    (unless fs-blit:loaded
-      (let (
-	    (frag (gl:create-shader gl:fragment-shader))
-	    (vert (gl:create-shader gl:vertex-shader))
-	    (frag-src "
-#version 130
-uniform sampler2D tex;
-in vec2 uv;
-void main(){
-
-  vec4 col = texture(tex, vec2(uv.x, uv.y));
-  if(col == vec4(1,0,1,1) || col == vec4(0,0,0,1))
-   discard;
-  gl_FragColor = col;
-}
-")
-	  (vert-src "
-#version 330
-uniform vec2 offset;
-uniform vec2 size;
-uniform vec2 dir;
-uniform vec2 cam_offset;
-uniform vec2 cam_size;
-
-
-layout(location = 0) in vec2 vertex;
-layout(location = 1) in vec2 uv_in;
-out vec2 uv;
-
-void main(){
-  vec2 v2 = vec2(-dir.y, dir.x);
-  vec2 v = vec2(dir.x * vertex.x + v2.x * vertex.y,
-                dir.y * vertex.x + v2.y * vertex.y);
-  uv = uv_in;
-  gl_Position = vec4(((v * size + offset - cam_offset) / cam_size ) * 2,0.0,1.0);
-}
-"))
-	(setf fs-blit:loaded true)
-	(setf fs-blit:shader (gl:create-program))
-	(let ((frag-src-len (cast (strlen frag-src) u32)))
-	  (gl:shader-source frag 1 (addrof frag-src) (addrof frag-src-len)))
-	(let ((vert-src-len (cast (strlen vert-src) u32)))
-	  (gl:shader-source vert 1 (addrof vert-src) (addrof vert-src-len)))
-	(gl:compile-shader frag)
-	(gl:compile-shader vert)
-	
-	(print "**** frag ****" newline)
-	(text-box:print-shader-errors frag)
-	(print "**** vert ****" newline)
-	(text-box:print-shader-errors vert)
-	
-	(gl:attach-shader fs-blit:shader frag)
-	(gl:attach-shader fs-blit:shader vert)
-	(gl:link-program fs-blit:shader)
-	
-	(setf fs-blit:shader:tex
-	      (gl:get-uniform-location fs-blit:shader "tex"))
-	(setf fs-blit:shader:offset (gl:get-uniform-location fs-blit:shader "offset"))
-	(setf fs-blit:shader:size (gl:get-uniform-location fs-blit:shader "size"))
-	(setf fs-blit:shader:dir (gl:get-uniform-location fs-blit:shader "dir"))
-	(setf fs-blit:shader:cam-size (gl:get-uniform-location fs-blit:shader "cam_size"))
-	(setf fs-blit:shader:cam-offset (gl:get-uniform-location fs-blit:shader "cam_offset"))
-	(gl:use-program fs-blit:shader)
-	(gl:uniform-2f fs-blit:shader:offset 0 0)
-	(gl:uniform-2f fs-blit:shader:size 1 1)
-	(gl:uniform-2f fs-blit:shader:dir 1 0)
-	(gl:uniform-2f fs-blit:shader:cam-size 1 1)
-	(gl:uniform-2f fs-blit:shader:cam-offset 0 0)
-	)))
+(load "fs-blit.lisp")
+(load "fs-blit2.lisp")
 (fs-blit:load)
+(fs-blit2:load)
 (defun fs-blit:bpp (gl:enum (bpp i32))
   (if (eq bpp 1)
       gl:red
@@ -381,10 +305,11 @@ void main(){
 (defvar tex:virus (tex:load "virus.png"))
 (defvar tex:enemy (tex:load "enemy.png"))
 (defvar tex:bubbles (tex:load-repeat "bubbles.png"))
+(defvar tex:flesh-wall (tex:load-repeat "flesh-wall.png"))
 (gl:enable-vertex-attrib-array 0)   
 (gl:enable-vertex-attrib-array 1)
 (defvar game-tex (fs-blit:load-image backbuf gl:clamp-to-border))
-(gl:use-program fs-blit:shader)
+
 ;(print (cast tex:bubbles i32) newline)
 ;(exit 0)
 (defun run-game
@@ -410,17 +335,18 @@ void main(){
 		       1.0
 		       0.0))))
 	  (setf player-pos (+ (* (vec2:rot90 player-dir) pc 0.2) player-pos)))
-	
+	(gl:use-program fs-blit:shader)
 	(gl:clear gl:color-buffer-bit)
 	;; draw backdrop
-	(gl:uniform fs-blit:shader:cam-offset (* player-pos 4.0))
-	(gl:uniform fs-blit:shader:cam-size (vec w h))
+	
 	
 	(gl:bind-buffer gl:array-buffer rect-huge-uv-vbo)
 	(gl:vertex-attrib-pointer 1 2 gl:float gl:false 0 null)
 	(gl:bind-buffer gl:array-buffer rect-vbo)
 	(gl:vertex-attrib-pointer 0 2 gl:float gl:false 0 null) 
-	
+
+	(gl:uniform fs-blit:shader:cam-offset (* player-pos 4.0))
+	(gl:uniform fs-blit:shader:cam-size (vec w h))
 	(gl:uniform fs-blit:shader:size (vec 2000 2000))
 	(gl:uniform fs-blit:shader:offset (vec -1000 -1000))
 	(gl:uniform fs-blit:shader:dir 1.0 0.0)
@@ -430,8 +356,12 @@ void main(){
 	(gl:bind-buffer gl:array-buffer rect-vbo)
 	(gl:vertex-attrib-pointer 1 2 gl:float gl:false 0 null)
 
+
+
 	;; draw walls
-	(gl:uniform fs-blit:shader:cam-offset player-pos)
+	(gl:use-program fs-blit2:shader)
+	(gl:uniform fs-blit2:shader:cam-offset player-pos)
+	(gl:uniform fs-blit2:shader:cam-size (vec w h))
 	(let ((w (cast (/ (member backbuf width) 2) i64)))
 	  ;; draw to back buffer
 	  (range row (- 0 w) w
@@ -444,35 +374,44 @@ void main(){
 			  (setf (deref (lookup-point (make-point (+ row w) (+ col w)) backbuf))
 				color))))))
 	(fs-blit:reload-image game-tex backbuf)
-	(gl:uniform fs-blit:shader:cam-offset player-pos)
 
 	(let ((game-offset (- player-pos (vec2:floor player-pos))))
 	  (let ((offset2 game-offset))
 	    (setf offset2 (- (vec 0 0) offset2))
-	    (gl:uniform fs-blit:shader:offset (+ offset2 (- player-pos (* (vec w h) 0.5))))
+	    (gl:uniform fs-blit2:shader:offset (+ offset2 (- player-pos (* (vec w h) 0.5))))
 	    ))
+	(gl:uniform fs-blit2:shader:cam-offset player-pos)
+	(gl:uniform fs-blit2:shader:size (vec w h))
+	(gl:uniform fs-blit2:shader:dir 1 0)
 
-	(gl:uniform fs-blit:shader:size (vec w h))
-	
-	(gl:uniform fs-blit:shader:dir 1 0)
 	(gl:bind-buffer gl:array-buffer rect-vbo)
 	(gl:vertex-attrib-pointer 0 2 gl:float gl:false 0 null) 
+	(gl:active-texture gl:texture1)
+	(gl:bind-texture gl:texture-2d tex:flesh-wall)
+	(gl:active-texture gl:texture0)
 	(gl:bind-texture gl:texture-2d game-tex)
+	(let ((uvs (the 16 f64)))
+	  (gl:uniform fs-blit2:shader:uv-scale (vec uvs uvs))
+	  (gl:uniform fs-blit2:shader:uv-offset (* (/ (vec2:floor player-pos) (vec w h)) uvs)))
 	(gl:draw-arrays gl:quads 0 4)	  
 
-
+	;; draw player
+	(gl:use-program fs-blit:shader)
+	(gl:uniform fs-blit:shader:cam-offset player-pos)
+	(gl:uniform fs-blit:shader:size (vec w h))
 	(gl:bind-buffer gl:array-buffer rect-one-vbo)
 	(gl:vertex-attrib-pointer 0 2 gl:float gl:false 0 null) 
 	(gl:uniform fs-blit:shader:size (vec 4 4))
 	(gl:uniform fs-blit:shader:offset player-pos)
-	;(print player-pos newline)
+
 	(gl:uniform fs-blit:shader:dir player-dir)
 	(gl:bind-texture gl:texture-2d tex:virus)
 	(gl:draw-arrays gl:quads 0 4)
+
+	;; draw enemies
 	(gl:bind-texture gl:texture-2d tex:enemy)
 	(gl:uniform fs-blit:shader:size (vec 2 2))
 	(let ((fit (* (cast iteration f32) 0.1)))
-	  (print fit newline)
 	  (range it 0 enemy-cnt
 		 (let ((f2 (+ fit (cast it f32))))
 		   (gl:uniform-2f fs-blit:shader:dir (sin32 f2) (cos32 f2))

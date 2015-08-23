@@ -148,6 +148,10 @@
 (glvar gl:static-draw 0x88E4)
 (glvar gl:dynamic-draw 0x88E8)
 (glvar gl:blend 0xbe2)
+(glvar gl:texture0 0x84C0)
+(glvar gl:texture1 0x84C1)
+
+
 ;; #define GL_BLEND				0x0BE2
 ;; #define GL_BLEND_SRC				0x0BE1
 ;; #define GL_BLEND_DST				0x0BE0
