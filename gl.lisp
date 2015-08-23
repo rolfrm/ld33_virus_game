@@ -123,7 +123,8 @@
 (glvar gl:texture-wrap-s 0x2802)
 (glvar gl:texture-wrap-t 0x2803)
 (glvar gl:clamp-to-border 0x812d)
-
+(glvar gl:clamp 0x2900)
+(glvar gl:repeat 0x2901)
 ;; defines
 
 (glvar gl:texture-1d 0x0DE0)
