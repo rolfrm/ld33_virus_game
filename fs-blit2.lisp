@@ -11,6 +11,7 @@
 (defvar fs-blit2:shader:cam-offset :type gl:uniform-loc)
 (defvar fs-blit2:shader:uv-offset :type gl:uniform-loc)
 (defvar fs-blit2:shader:uv-scale :type gl:uniform-loc)
+(defvar fs-blit2:shader:items :type gl:uniform-loc)
 (defun fs-blit2:load
     (unless fs-blit2:loaded
       (let (
@@ -20,6 +21,7 @@
 #version 130
 uniform sampler2D tex;
 uniform sampler2D tex2;
+uniform float items;
 in vec2 uv;
 in vec2 uv2;
 void main(){
@@ -27,7 +29,9 @@ void main(){
   vec4 col = texture(tex, uv);
   if(col == vec4(1,0,1,1) || col == vec4(0,0,0,1))
    discard;
-  col = texture(tex2, mod(uv2,vec2(0.499,1)) + vec2(col.r * 128 - 0.5, 0.0)); 
+  col = texture(tex2, mod(uv2,vec2(1.0/items,1)) + vec2(col.r * (256.0/items) - (1.0/items), 0.0)); 
+  if(col == vec4(1,0,1,1) || col == vec4(0,0,0,1))
+   discard;
   gl_FragColor = col;
 }
 ")
@@ -40,6 +44,7 @@ uniform vec2 cam_offset;
 uniform vec2 cam_size;
 uniform vec2 uv_offset;
 uniform vec2 uv_scale;
+
 
 layout(location = 0) in vec2 vertex;
 layout(location = 1) in vec2 uv_in;
@@ -84,6 +89,7 @@ void main(){
 	(setf fs-blit2:shader:cam-offset (gl:get-uniform-location fs-blit2:shader "cam_offset"))
 	(setf fs-blit2:shader:uv-offset (gl:get-uniform-location fs-blit2:shader "uv_offset"))
 	(setf fs-blit2:shader:uv-scale (gl:get-uniform-location fs-blit2:shader "uv_scale"))
+	(setf fs-blit2:shader:items (gl:get-uniform-location fs-blit2:shader "items"))
 	(gl:use-program fs-blit2:shader)
 	(gl:uniform-2f fs-blit2:shader:offset 0 0)
 	(gl:uniform-2f fs-blit2:shader:size 1 1)
@@ -94,4 +100,5 @@ void main(){
 	(gl:uniform-1i fs-blit2:shader:tex 1)
 	(gl:uniform-2f fs-blit2:shader:uv-offset 0 0)
 	(gl:uniform-2f fs-blit2:shader:uv-scale 1 1)
+	(gl:uniform-1f fs-blit2:shader:items 4.0)
 	)))
