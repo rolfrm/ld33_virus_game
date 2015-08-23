@@ -215,7 +215,7 @@
 	      (upper-vec (point-to-vec2 (deref last-upper-pt))))
 	  (let ((perp-vec (vec2-normalize (vec2:rot90 (- lower-vec upper-vec )))))
 	    (when (> (vec2-length perp-vec) 0)
-	      (setf player-dir (+ (* player-dir 0.5) (* perp-vec 0.5)))))
+	      (setf player-dir (+ (* player-dir 0.8) (* perp-vec 0.2)))))
 	  ))
   (incr player-pos (* player-dir 0.4))
   ))
