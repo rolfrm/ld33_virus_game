@@ -107,11 +107,11 @@
 
 (defvar lv (im:load-image "level1.png"));"person.png"))
 
-(defvar lv2 (im:load-image "chunks/eye.png"))
-(analyze-image lv2)
-(exit 0)
-(print "Image2: " (member lv2 bpp) " " newline)
-(exit 0)
+;(defvar lv2 (im:load-image "chunks/eye.png"))
+;(analyze-image lv2)
+;(exit 0)
+;(print "Image2: " (member lv2 bpp) " " newline)
+;(exit 0)
 (defvar backbuf (im:make 200 200 1))
 (print "Image: " (member lv width) " " (member lv height) " " (member lv bpp) newline)
 ;(analyze-image lv)
